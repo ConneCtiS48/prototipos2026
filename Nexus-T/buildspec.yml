@@ -7,6 +7,8 @@ phases:
   pre_build:
     commands:
       - cd Nexus-T
+      - echo VITE_SUPABASE_URL=${VITE_SUPABASE_URL} >> .env
+      - echo VITE_SUPABASE_PUBLISHABLE_KEY=${VITE_SUPABASE_PUBLISHABLE_KEY} >> .env
       - npm install
   build:
     commands:
