@@ -154,114 +154,73 @@ export default function OrientacionAlumnos({ setErrorMessage }) {
         setStudentGroup(groupResult.data)
       }
 
-      // Paso 3: Buscar perfil en user_profiles para obtener incidencias y justificantes
-      // Buscar por nombre y email para encontrar el user_profile correspondiente
-      const student = studentResult.data
-      
-      let userProfileId = null
-      if (student.email) {
-        const { data: profile } = await supabase
-          .from('user_profiles')
-          .select('id')
-          .eq('email', student.email)
-          .maybeSingle()
-        
-        if (profile) {
-          userProfileId = profile.id
-        }
-      }
+      // Paso 3: Cargar incidencias y justificantes por students.id (no user_profiles)
+      setStudentIncidents([])
+      setStudentJustifications([])
 
-      // Si no se encontró por email, buscar por nombre
-      if (!userProfileId) {
-        const { data: profiles } = await supabase
-          .from('user_profiles')
-          .select('id, first_name, last_name')
-          .ilike('first_name', `%${student.first_name}%`)
-          .ilike('last_name', `%${student.paternal_last_name}%`)
-          .limit(1)
-        
-        if (profiles && profiles.length > 0) {
-          userProfileId = profiles[0].id
-        }
-      }
-
-      // Paso 4: Cargar incidencias si se encontró userProfileId
-      if (userProfileId) {
-        const { data: incidentsData, error: incidentsError } = await supabase
-          .from('incidents')
-          .select(
-            `
-            id,
-            situation,
-            action,
-            follow_up,
-            created_at,
-            incident_types (
-              id,
-              name,
-              code,
-              category
-            ),
-            teacher_subject:teacher_subjects (
-              id,
-              subject_name,
-              shift,
-              group:groups (
-                id,
-                nomenclature
-              )
-            ),
-            observations:incident_observations (
-              id,
-              comment,
-              created_at,
-              user:user_profiles!incident_observations_user_id_fkey (
-                first_name,
-                last_name,
-                email
-              )
-            )
+      const { data: incidentsData, error: incidentsError } = await supabase
+        .from('incidents')
+        .select(
           `
-          )
-          .eq('student_id', userProfileId)
-          .order('created_at', { ascending: false })
-
-        if (incidentsError) {
-          console.warn('Error al cargar incidencias:', incidentsError)
-          setStudentIncidents([])
-        } else {
-          setStudentIncidents(incidentsData || [])
-        }
-
-        // Paso 5: Cargar justificantes
-        const { data: justificationsData, error: justificationsError } = await supabase
-          .from('justifications')
-          .select(
-            `
+          id,
+          situation,
+          action,
+          follow_up,
+          created_at,
+          incident_types (
             id,
-            reason,
+            name,
+            code,
+            category
+          ),
+          group:groups!incidents_group_id_fkey (
+            id,
+            nomenclature
+          ),
+          observations:incident_observations (
+            id,
+            comment,
             created_at,
-            group:groups (
-              id,
-              nomenclature,
-              grade,
-              specialty,
-              section
+            user:user_profiles!incident_observations_user_id_fkey (
+              first_name,
+              last_name,
+              email
             )
-          `
           )
-          .eq('student_id', userProfileId)
-          .order('created_at', { ascending: false })
+        `
+        )
+        .eq('student_id', studentId)
+        .order('created_at', { ascending: false })
 
-        if (justificationsError) {
-          console.warn('Error al cargar justificantes:', justificationsError)
-          setStudentJustifications([])
-        } else {
-          setStudentJustifications(justificationsData || [])
-        }
+      if (incidentsError) {
+        console.warn('Error al cargar incidencias:', incidentsError)
       } else {
-        setStudentIncidents([])
-        setStudentJustifications([])
+        setStudentIncidents(incidentsData || [])
+      }
+
+      const { data: justificationsData, error: justificationsError } = await supabase
+        .from('justifications')
+        .select(
+          `
+          id,
+          reason,
+          created_at,
+          group:groups!justifications_group_id_fkey (
+            id,
+            nomenclature,
+            grade,
+            specialty,
+            section
+          )
+        `
+        )
+        .eq('student_id', studentId)
+        .order('created_at', { ascending: false })
+
+      if (justificationsError) {
+        console.warn('Error al cargar justificantes:', justificationsError)
+      } else {
+        setStudentJustifications(justificationsData || [])
       }
     } catch (err) {
       console.error('Error al cargar detalles del estudiante:', err)

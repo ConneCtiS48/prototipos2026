@@ -9,6 +9,33 @@ CREATE TABLE auth.audit_log_entries (
   ip_address character varying NOT NULL DEFAULT ''::character varying,
   CONSTRAINT audit_log_entries_pkey PRIMARY KEY (id)
 );
+CREATE TABLE auth.custom_oauth_providers (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  provider_type text NOT NULL CHECK (provider_type = ANY (ARRAY['oauth2'::text, 'oidc'::text])),
+  identifier text NOT NULL UNIQUE CHECK (identifier ~ '^[a-z0-9][a-z0-9:-]{0,48}[a-z0-9]$'::text),
+  name text NOT NULL CHECK (char_length(name) >= 1 AND char_length(name) <= 100),
+  client_id text NOT NULL CHECK (char_length(client_id) >= 1 AND char_length(client_id) <= 512),
+  client_secret text NOT NULL,
+  acceptable_client_ids ARRAY NOT NULL DEFAULT '{}'::text[],
+  scopes ARRAY NOT NULL DEFAULT '{}'::text[],
+  pkce_enabled boolean NOT NULL DEFAULT true,
+  attribute_mapping jsonb NOT NULL DEFAULT '{}'::jsonb,
+  authorization_params jsonb NOT NULL DEFAULT '{}'::jsonb,
+  enabled boolean NOT NULL DEFAULT true,
+  email_optional boolean NOT NULL DEFAULT false,
+  issuer text CHECK (issuer IS NULL OR char_length(issuer) >= 1 AND char_length(issuer) <= 2048),
+  discovery_url text CHECK (discovery_url IS NULL OR char_length(discovery_url) <= 2048),
+  skip_nonce_check boolean NOT NULL DEFAULT false,
+  cached_discovery jsonb,
+  discovery_cached_at timestamp with time zone,
+  authorization_url text CHECK (authorization_url IS NULL OR authorization_url ~~ 'https://%'::text),
+  token_url text CHECK (token_url IS NULL OR token_url ~~ 'https://%'::text),
+  userinfo_url text CHECK (userinfo_url IS NULL OR userinfo_url ~~ 'https://%'::text),
+  jwks_uri text CHECK (jwks_uri IS NULL OR jwks_uri ~~ 'https://%'::text),
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT custom_oauth_providers_pkey PRIMARY KEY (id)
+);
 CREATE TABLE auth.flow_state (
   id uuid NOT NULL,
   user_id uuid,
@@ -271,4 +298,32 @@ CREATE TABLE auth.users (
   deleted_at timestamp with time zone,
   is_anonymous boolean NOT NULL DEFAULT false,
   CONSTRAINT users_pkey PRIMARY KEY (id)
+);
+CREATE TABLE auth.webauthn_challenges (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid,
+  challenge_type text NOT NULL CHECK (challenge_type = ANY (ARRAY['signup'::text, 'registration'::text, 'authentication'::text])),
+  session_data jsonb NOT NULL,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  expires_at timestamp with time zone NOT NULL,
+  CONSTRAINT webauthn_challenges_pkey PRIMARY KEY (id),
+  CONSTRAINT webauthn_challenges_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
+);
+CREATE TABLE auth.webauthn_credentials (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  credential_id bytea NOT NULL,
+  public_key bytea NOT NULL,
+  attestation_type text NOT NULL DEFAULT ''::text,
+  aaguid uuid,
+  sign_count bigint NOT NULL DEFAULT 0,
+  transports jsonb NOT NULL DEFAULT '[]'::jsonb,
+  backup_eligible boolean NOT NULL DEFAULT false,
+  backed_up boolean NOT NULL DEFAULT false,
+  friendly_name text NOT NULL DEFAULT ''::text,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  last_used_at timestamp with time zone,
+  CONSTRAINT webauthn_credentials_pkey PRIMARY KEY (id),
+  CONSTRAINT webauthn_credentials_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
 );
