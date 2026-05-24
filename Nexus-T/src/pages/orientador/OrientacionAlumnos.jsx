@@ -234,11 +234,9 @@ export default function OrientacionAlumnos({ setErrorMessage }) {
 
   // Manejar selección de estudiante
   const handleSelectStudent = (id) => {
-    const student = students.find((s) => s.id === id)
-    if (student) {
-      setSelectedStudentId(id)
-      fetchStudentDetails(id)
-    }
+    if (!id) return
+    setSelectedStudentId(id)
+    fetchStudentDetails(id)
   }
 
   return (
